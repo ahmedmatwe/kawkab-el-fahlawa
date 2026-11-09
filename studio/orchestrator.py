@@ -210,7 +210,7 @@ def stage_storyboard(con, eid: int) -> None:
         return
     d = epdir(eid)
     for s in shots:
-        s["frame_path"] = str(consistency.first_frame(s["ref"], d / f"frame_{s['idx']:02d}.jpg"))
+        s["frame_path"] = str(consistency.first_frame(s["ref"], d / f"frame_{s['idx']:02d}.jpg", s["location"]))
         wav = d / f"line_{s['idx']:02d}.wav"
         if not wav.exists():
             synth_line(s["speaker"], s["text"], s["emotion"], wav)
@@ -234,7 +234,7 @@ def _ensure_inputs(eid: int, shots: List[dict]) -> None:
     d = epdir(eid)
     for s in shots:
         if not Path(s["frame_path"]).exists():
-            consistency.first_frame(s["ref"], Path(s["frame_path"]))
+            consistency.first_frame(s["ref"], Path(s["frame_path"]), s.get("location", "alley"))
         if not Path(s["audio_path"]).exists():
             synth_line(s["speaker"], s["text"], s["emotion"], Path(s["audio_path"]))
 
