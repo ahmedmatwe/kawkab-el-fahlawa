@@ -1,0 +1,101 @@
+{
+  "series": {
+    "id": "kawkab_el_fahlawa",
+    "name": "كوكب الفهلوة",
+    "tagline": "هنا كل مشكلة ليها حل… وكل حل وراه مصيبة!",
+    "visual_style": "Pixar-style cinematic 3D animated cartoon, warm golden-hour light, old Cairo alley (hara) with brick houses, laundry lines, minarets in the background, Egyptian coffee shop sign, rich saturated colors, soft depth of field",
+    "rules": [
+      "Egyptian Arabic dialogue only",
+      "family friendly: no profanity, no sexual innuendo, no mocking social groups",
+      "no fabricated news, no defamation, rumours are never presented as facts",
+      "never show children (the video model rejects minors)",
+      "modest clothing only for every character"
+    ]
+  },
+  "characters": [
+    {
+      "id": "sayed_fahlawa",
+      "name": "المعلم سيد فهلوة",
+      "short": "سيد",
+      "age": 48,
+      "job": "صاحب قهوة في الحارة",
+      "look_en": "heavyset 48-year-old Egyptian man, thick black mustache, round cheeks, beige-brown galabiya, light white knitted skullcap (taqiyah), patterned dark-red paisley shawl over shoulders",
+      "personality": "واثق جدًا في نفسه، بيحب الفتي وبيدّعي إنه فاهم في كل حاجة، طيب القلب",
+      "speech": "مصري شعبي، نبرة جهورية، بيتكلم بثقة",
+      "catchphrases": ["اسمع مني أنا… أنا فاهم اللعبة دي!", "على كوكب الفهلوة مفيش مستحيل!"],
+      "role": "البطل الكوميدي وصاحب الحلول اللي بتعمل مصايب",
+      "voice": {"engine": "edge", "voice": "ar-EG-ShakirNeural", "pitch": "-8Hz", "rate": "-4%"},
+      "refs": ["assets/characters/refs/sayed_fahlawa_poster_b.png", "assets/characters/refs/sayed_fahlawa_poster_a.png"]
+    },
+    {
+      "id": "zizo_trend",
+      "name": "زيزو تريند",
+      "short": "زيزو",
+      "age": 24,
+      "job": "صانع محتوى ومهووس تكنولوجيا وذكاء اصطناعي",
+      "look_en": "slim 24-year-old Egyptian young man, curly black hair, light backwards cap, bright yellow hoodie, black headphones around the neck, holding a smartphone",
+      "personality": "متحمس، بيتكلم بسرعة، بيجري ورا الترندات، وساعات بيثق في التكنولوجيا زيادة عن اللزوم",
+      "speech": "سريع، شبابي، فيه كلمات إنجليزي خفيفة",
+      "catchphrases": ["يا جدعان دي هتكسر الدنيا!", "دا ترند عالمي يا معلم!"],
+      "role": "بيدخّل الترندات والتكنولوجيا لعالم المسلسل",
+      "voice": {"engine": "edge", "voice": "ar-EG-ShakirNeural", "pitch": "+14Hz", "rate": "+14%"},
+      "refs": ["assets/characters/refs/zizo_trend_poster_b.png", "assets/characters/refs/zizo_trend_poster_a.png"]
+    },
+    {
+      "id": "om_abdo",
+      "name": "أم عبده",
+      "short": "أم عبده",
+      "age": 52,
+      "job": "صاحبة بقالة وست الحارة",
+      "look_en": "plump 52-year-old Egyptian woman, purple (mauve) hijab fully covering hair, long-sleeved dark-purple galabiya with pink floral pattern, gold hoop earrings and gold bangles",
+      "personality": "ذكية، قوية الشخصية، اجتماعية، عارفة أخبار الحارة كلها وبتحب تتدخل",
+      "speech": "ست مصرية ناضجة، حادة أحيانًا بطريقة كوميدية",
+      "catchphrases": ["أنا ماليش دعوة… بس هقولك اللي حصل!", "إلا أنا ما أعرفش؟؟"],
+      "role": "مصدر المفاجآت والأخبار والمواقف الاجتماعية",
+      "voice": {"engine": "edge", "voice": "ar-EG-SalmaNeural", "pitch": "-6Hz", "rate": "+2%"},
+      "refs": ["assets/characters/refs/om_abdo_poster_b.png", "assets/characters/refs/om_abdo_poster_a.png"]
+    },
+    {
+      "id": "abdo_ekhtera",
+      "name": "عبده اختراع",
+      "short": "عبده",
+      "age": 35,
+      "job": "صنايعي ومخترع هاوي",
+      "look_en": "35-year-old Egyptian craftsman, distinctive thick black mustache, blue work overalls, brown leather tool belt with wrench and screwdrivers, safety goggles pushed up on top of his head",
+      "personality": "مقتنع إنه عبقري، بيبالغ في ثقته في اختراعاته",
+      "speech": "واثق، بيستخدم كلام صنايعية",
+      "catchphrases": ["دي بسيطة يا باشا… بس متقربش منها!", "هاتلي أي خردة… وأظبطهولك!"],
+      "role": "بيحوّل المشاكل الصغيرة لكوارث كوميدية باختراعاته",
+      "voice": {"engine": "edge", "voice": "ar-EG-ShakirNeural", "pitch": "+3Hz", "rate": "+4%"},
+      "refs": ["assets/characters/refs/abdo_ekhtera_poster_b.png", "assets/characters/refs/abdo_ekhtera_poster_a.png"]
+    },
+    {
+      "id": "am_ragab",
+      "name": "عم رجب",
+      "short": "رجب",
+      "age": 42,
+      "job": "سواق ميكروباص",
+      "look_en": "strong 42-year-old Egyptian man, balding, black mustache, red-and-white checkered shirt, brown vest, sunglasses resting on top of his head, wristwatch",
+      "personality": "عصبي، سريع الانفعال، صريح، بس قلبه طيب",
+      "speech": "عالي وسريع، بيكلم بإيده",
+      "catchphrases": ["أنا من أولها قلتلكم الموضوع مش طبيعي!", "ريحة المشاوير والمشاوير الطويلة!"],
+      "role": "الشارع والمواصلات والحياة اليومية",
+      "voice": {"engine": "edge", "voice": "ar-EG-ShakirNeural", "pitch": "-16Hz", "rate": "+8%"},
+      "refs": ["assets/characters/refs/am_ragab_poster_b.png", "assets/characters/refs/am_ragab_poster_a.png"]
+    }
+  ],
+  "relationships": [
+    ["sayed_fahlawa", "zizo_trend", "سيد بيعتبر زيزو ابن الحارة الصغير، وزيزو بيجرّه لكل ترند"],
+    ["sayed_fahlawa", "om_abdo", "منافسة دايمة مين يعرف أخبار الحارة الأول"],
+    ["om_abdo", "abdo_ekhtera", "أم عبده بتستعين بعبده في تصليح البقالة وبتندم كل مرة"],
+    ["am_ragab", "sayed_fahlawa", "رجب زبون القهوة الدايم وأول واحد يعترض على أفكار سيد"],
+    ["abdo_ekhtera", "zizo_trend", "زيزو بيصوّر اختراعات عبده للتيك توك"]
+  ],
+  "locations": {
+    "cafe": "Sayed's traditional Egyptian street coffee shop: wooden chairs, brass shisha, tea glasses, hanging sign 'قهوة المعلم سيد'",
+    "alley": "narrow old Cairo alley (hara) with brick houses, laundry lines, minaret in background, warm sunlight",
+    "grocery": "Om Abdo's small crowded grocery shop with shelves of colorful goods",
+    "microbus": "Am Ragab's white-and-yellow Egyptian microbus parked in the alley",
+    "workshop": "Abdo's cluttered workshop full of tools, wires and odd inventions"
+  }
+}

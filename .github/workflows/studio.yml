@@ -1,0 +1,66 @@
+# Kawkab El Fahlawa studio — runs in the cloud (GitHub Actions); the Mac can be off.
+# Every run: read Telegram replies → morning ideas (once a day) → advance every open episode.
+name: studio
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'tick | morning'
+        default: tick
+
+concurrency:
+  group: studio
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # save state on the `state` branch
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      STUDIO_MODE: ${{ vars.STUDIO_MODE || 'production' }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -q -r requirements.txt
+      - run: scripts/state.sh load
+      - run: python -m studio ${{ inputs.command || 'tick' }}
+      - name: Save state
+        if: always()
+        run: scripts/state.sh save
+      - name: Keep the videos for 7 days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: episodes-${{ github.run_id }}
+          path: data/episodes/*/final.mp4
+          if-no-files-found: ignore
+          retention-days: 7
+
+  test:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -q -r requirements.txt
+      - run: STUDIO_MODE=demo python -m pytest -q
