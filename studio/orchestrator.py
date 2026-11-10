@@ -69,9 +69,17 @@ def morning(con, force: bool = False) -> int:
 
 
 # ───────────────────────── Telegram replies ─────────────────────────
+def episode_mode() -> str:
+    """production = real LLM + real video. pilot = pre-written script but REAL video/voices (no DEMO stamp).
+    demo = everything mocked (stamped DEMO)."""
+    if not demo_mode():
+        return "production"
+    return "pilot" if get_provider().name != "mock" else "demo"
+
+
 def start_episode(con, idea: dict, idea_id: Optional[int], by: str) -> int:
     cur = con.execute("INSERT INTO episodes(day,status,mode,idea,created,updated) VALUES(?,?,?,?,?,?)",
-                      (today(), "SCRIPT_DRAFT", "demo" if demo_mode() else "production",
+                      (today(), "SCRIPT_DRAFT", episode_mode(),
                        json.dumps(idea, ensure_ascii=False), now(), now()))
     eid = cur.lastrowid
     if idea_id:
@@ -337,7 +345,7 @@ def stage_qa(con, eid: int) -> None:
     if fallbacks:
         vqa = (max(vqa[0] - 4 * fallbacks, 0), vqa[1], vqa[2], vqa[3] + [f"{fallbacks} لقطة صورة ثابتة بدل فيديو"])
     saf = safety.review(script)
-    decision, total, breakdown = qa.final_decision(int(ep["score"] or 0), sims, vqa, saf, ep["mode"] == "demo")
+    decision, total, breakdown = qa.final_decision(int(ep["score"] or 0), sims, vqa, saf, ep["mode"] != "production")
     con.execute("INSERT INTO agent_tasks(episode_id,agent,status,decision,output,started,finished) VALUES(?,?,?,?,?,?,?)",
                 (eid, "A21", "done", decision, json.dumps(breakdown, ensure_ascii=False), now(), now()))
     set_status(con, eid, "AWAITING_PUBLISH_APPROVAL" if decision != "REJECTED" else "FAILED",

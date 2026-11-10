@@ -36,6 +36,15 @@ def username() -> str:
     return m.group(1)
 
 
+def _small_jpeg_b64(path: str) -> str:
+    """Frames travel inside the kernel source (no dataset upload/version race), so keep them compact."""
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.open(path).convert("RGB").save(buf, "JPEG", quality=82, optimize=True)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
 class KaggleProvider(Provider):
     name = "kaggle"
 
@@ -45,12 +54,14 @@ class KaggleProvider(Provider):
             "episode_id": episode_id, "model": g["model"], "width": g["gen_width"], "height": g["gen_height"],
             "frames": g["frames"], "fps": g["fps"], "steps": g["steps"],
             "shots": [{"idx": s["idx"], "prompt": s["prompt"], "negative": s["negative"],
-                       "frame_b64": base64.b64encode(Path(s["frame_path"]).read_bytes()).decode()} for s in shots],
+                       "frame_b64": _small_jpeg_b64(s["frame_path"])} for s in shots],
         }
         kdir = workdir / "kaggle_kernel"
         kdir.mkdir(parents=True, exist_ok=True)
         tpl = (ROOT / "studio/video/kernel_template.py").read_text(encoding="utf-8")
-        code = tpl.replace("__JOB_B64__", base64.b64encode(json.dumps(job).encode()).decode())
+        code = tpl.replace('json.loads(base64.b64decode("__JOB_B64__").decode("utf-8"))', f"json.loads({json.dumps(job)!r})")
+        if len(code.encode()) > 950_000:  # Kaggle rejects kernel sources around 1 MB
+            raise RuntimeError(f"kernel source too large ({len(code) // 1024} KB) — split the episode into fewer shots")
         (kdir / "render.py").write_text(code, encoding="utf-8")
         user = username()
         (kdir / "kernel-metadata.json").write_text(json.dumps({

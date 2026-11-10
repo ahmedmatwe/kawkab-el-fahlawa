@@ -96,6 +96,8 @@ def episode(con: sqlite3.Connection, eid: int) -> sqlite3.Row:
 def set_status(con: sqlite3.Connection, eid: int, status: str, **fields: Any) -> None:
     cols = ["status=?", "updated=?"]
     vals: list = [status, now()]
+    if "error" not in fields and status not in ("FAILED", "MANUAL_ACTION_REQUIRED"):
+        fields["error"] = None  # a stage succeeded → the previous (retried) error is no longer current
     for k, v in fields.items():
         cols.append(f"{k}=?")
         vals.append(json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else v)
