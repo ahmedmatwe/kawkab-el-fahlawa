@@ -1,0 +1,31 @@
+# Checks that the studio can get Egyptian-colloquial voices from ahmedmatwe/egyptian-tts (needs secret EGY_TTS_TOKEN).
+name: voice-test
+on: workflow_dispatch
+jobs:
+  voice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      EGY_TTS_TOKEN: ${{ secrets.EGY_TTS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12', cache: pip}
+      - run: pip install -q -r requirements.txt && sudo apt-get -qq install -y ffmpeg >/dev/null
+      - name: Voice two lines
+        run: |
+          python - <<'PY'
+          import os, wave
+          from pathlib import Path
+          from studio import egytts
+          from studio.audio import synth_lines
+          assert egytts.available(), "egyptian-tts not reachable with EGY_TTS_TOKEN"
+          d = Path("out"); d.mkdir()
+          items = [{"character": "zizo_trend", "text": "يا معلم سيد! أنا جبتلك اختراع يعرف كل حاجة في الدنيا!", "emotion": "surprised", "out": d / "zizo.wav"},
+                   {"character": "sayed_fahlawa", "text": "حتى اللي في دماغي؟!", "emotion": "thinking", "out": d / "sayed.wav"}]
+          egytts.synth_batch(items)  # Egyptian engine only — no edge-tts fallback in this check
+          for it in items:
+              w = wave.open(str(it["out"])); print(it["out"], round(w.getnframes() / w.getframerate(), 2), "s")
+          PY
+      - uses: actions/upload-artifact@v4
+        with: {name: voice-test, path: out/, retention-days: 1}
