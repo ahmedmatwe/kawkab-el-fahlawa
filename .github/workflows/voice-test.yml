@@ -25,7 +25,7 @@ jobs:
                    {"character": "sayed_fahlawa", "text": "حتى اللي في دماغي؟!", "emotion": "thinking", "out": d / "sayed.wav"}]
           egytts.synth_batch(items)  # Egyptian engine only — no edge-tts fallback in this check
           for it in items:
-              w = wave.open(str(it["out"])); print(it["out"], round(w.getnframes() / w.getframerate(), 2), "s")
+              size = it["out"].stat().st_size; assert size > 20000, it["out"]; print(it["out"], size, "bytes")
           PY
       - uses: actions/upload-artifact@v4
         with: {name: voice-test, path: out/, retention-days: 1}
