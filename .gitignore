@@ -6,3 +6,8 @@ data/
 *.mp4
 .env
 kaggle.json
+*.m4a
+*.wav
+/*.png
+.venv-tts/
+hf-cache/

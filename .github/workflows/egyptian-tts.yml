@@ -1,0 +1,31 @@
+name: Egyptian TTS (CPU)
+on:
+  workflow_dispatch:
+    inputs:
+      text: {description: "النص بالعامية المصرية", required: true, default: "يا معلم سيد! أنا جبتلك اختراع يعرف كل حاجة في الدنيا!"}
+  workflow_call:
+    inputs:
+      text: {type: string, required: true}
+jobs:
+  speak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      HF_HOME: ${{ github.workspace }}/hf-cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11", cache: pip}
+      - uses: actions/cache@v4
+        with: {path: hf-cache, key: egyptian-tts-models-v1}
+      - name: Install (CPU torch)
+        run: |
+          pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install chatterbox-tts huggingface_hub safetensors "setuptools<81"
+      - name: Speak
+        run: |
+          start=$(date +%s)
+          python tools/egy_tts.py "${{ inputs.text }}" speech.wav
+          echo "seconds=$(( $(date +%s) - start ))"
+      - uses: actions/upload-artifact@v4
+        with: {name: speech, path: speech.wav}
