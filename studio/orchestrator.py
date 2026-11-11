@@ -14,7 +14,7 @@ from typing import List, Optional
 from . import telegram as tg
 from .agents import ideas as ideas_agent
 from .agents import consistency, log_task, qa, safety, storyboard, trends, writer
-from .audio import synth_line
+from .audio import synth_line, synth_lines
 from .config import DATA, demo_mode, settings
 from .db import audit, connect, episode, jload, kv_get, kv_set, now, set_status
 from .edit import assemble
@@ -220,8 +220,10 @@ def stage_storyboard(con, eid: int) -> None:
     for s in shots:
         s["frame_path"] = str(consistency.first_frame(s["ref"], d / f"frame_{s['idx']:02d}.jpg", s["location"]))
         wav = d / f"line_{s['idx']:02d}.wav"
-        if not wav.exists():
-            synth_line(s["speaker"], s["text"], s["emotion"], wav)
+        s["_wav"] = wav
+    synth_lines([{"character": s["speaker"], "text": s["text"], "emotion": s["emotion"], "out": s["_wav"]} for s in shots])
+    for s in shots:
+        wav = s.pop("_wav")
         con.execute("INSERT OR REPLACE INTO shots(episode_id,idx,data,prompt,status,attempts,audio_path) VALUES(?,?,?,?,?,?,?)",
                     (eid, s["idx"], json.dumps(s, ensure_ascii=False), s["prompt"], "pending", 0, str(wav)))
     log_task(con, eid, "A08+A11+A09+A13", "done", f"{len(shots)} shots, frames + voices ready")
@@ -243,8 +245,8 @@ def _ensure_inputs(eid: int, shots: List[dict]) -> None:
     for s in shots:
         if not Path(s["frame_path"]).exists():
             consistency.first_frame(s["ref"], Path(s["frame_path"]), s.get("location", "alley"))
-        if not Path(s["audio_path"]).exists():
-            synth_line(s["speaker"], s["text"], s["emotion"], Path(s["audio_path"]))
+    synth_lines([{"character": s["speaker"], "text": s["text"], "emotion": s["emotion"], "out": Path(s["audio_path"])}
+                 for s in shots if not Path(s["audio_path"]).exists()])
 
 
 def stage_generate(con, eid: int) -> None:

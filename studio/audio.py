@@ -1,5 +1,6 @@
 """A13 Voice Director: fixed voice profile per character (config/characters.json → voice).
-Engine: edge-tts with Microsoft's Egyptian neural voices (Shakir / Salma), free, no account.
+Primary engine: Egyptian-colloquial NAMAA TTS via the public egyptian-tts repo (studio/egytts.py), one run per episode.
+Fallback engine: edge-tts with Microsoft's Egyptian neural voices (Shakir / Salma), free, no account.
 Each character gets its own pitch/rate so the five voices stay distinguishable and stable across episodes."""
 from __future__ import annotations
 
@@ -44,3 +45,26 @@ def synth_line(character_id: str, text: str, emotion: str, out_wav: Path, retrie
          "apad=pad_dur=0.12", "-ac", "1", "-ar", "48000", str(out_wav)])
     mp3.unlink(missing_ok=True)
     return out_wav
+
+
+def synth_lines(items, retries: int = 1):
+    """items: [{"character","text","emotion","out": Path}]. Egyptian-colloquial voices in one batch; edge-tts fallback."""
+    from . import egytts
+    todo = [it for it in items if not Path(it["out"]).exists()]
+    if not todo:
+        return
+    if egytts.available():
+        for attempt in range(retries + 1):
+            try:
+                egytts.synth_batch(todo)
+                for it in todo:  # same post-processing as edge: trim silence, mono 48k
+                    p = Path(it["out"]); tmp = p.with_suffix(".raw.wav"); p.rename(tmp)
+                    run(["-i", str(tmp), "-af",
+                         "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,"
+                         "apad=pad_dur=0.12", "-ac", "1", "-ar", "48000", str(p)])
+                    tmp.unlink(missing_ok=True)
+                return
+            except Exception as e:
+                print("egyptian-tts failed:", e)
+    for it in todo:
+        synth_line(it["character"], it["text"], it.get("emotion", ""), Path(it["out"]))
