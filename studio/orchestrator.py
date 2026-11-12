@@ -298,6 +298,11 @@ def stage_poll(con, eid: int) -> bool:
                             (eid, s["idx"], "shot_video", r["path"], prov.name, json.dumps({"similarity": sim}), now()))
                 continue
         reason = r.get("error") or "; ".join(errs)
+        if r.get("quota"):  # free daily GPU quota ran out: not the shot's fault → retry later, attempt not counted
+            con.execute("UPDATE shots SET status='retry', attempts=MAX(attempts-1,0), error=? WHERE episode_id=? AND idx=?",
+                        (reason, eid, s["idx"]))
+            failed.append(f"لقطة {s['idx'] + 1}: {reason}")
+            continue
         final = s["attempts"] >= g["max_attempts_per_shot"]
         con.execute("UPDATE shots SET status=?, error=? WHERE episode_id=? AND idx=?",
                     ("fallback" if final else "retry", reason, eid, s["idx"]))

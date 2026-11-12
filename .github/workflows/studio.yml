@@ -4,7 +4,7 @@ name: studio
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '17 */2 * * *'   # every 2 hours: keeps the private repo inside the free 2000 min/month
   workflow_dispatch:
     inputs:
       command:
@@ -31,22 +31,35 @@ jobs:
       KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
       KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
       EGY_TTS_TOKEN: ${{ secrets.EGY_TTS_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      VIDEO_PROVIDER: ${{ vars.VIDEO_PROVIDER || 'hf' }}
     steps:
+      - name: Wait until Telegram is set up
+        id: ready
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::notice::Telegram secrets missing — skipping (no minutes wasted)"; echo "go=0" >> "$GITHUB_OUTPUT"
+          else echo "go=1" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@v4
+        if: steps.ready.outputs.go == '1'
         with:
           fetch-depth: 1
       - uses: actions/setup-python@v5
+        if: steps.ready.outputs.go == '1'
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -q -r requirements.txt
+      - run: pip install -q -r requirements.txt && sudo apt-get -qq install -y ffmpeg >/dev/null
+        if: steps.ready.outputs.go == '1'
       - run: scripts/state.sh load
+        if: steps.ready.outputs.go == '1'
       - run: python -m studio ${{ inputs.command || 'tick' }}
+        if: steps.ready.outputs.go == '1'
       - name: Save state
-        if: always()
+        if: always() && steps.ready.outputs.go == '1'
         run: scripts/state.sh save
       - name: Keep the videos for 7 days
-        if: always()
+        if: always() && steps.ready.outputs.go == '1'
         uses: actions/upload-artifact@v4
         with:
           name: episodes-${{ github.run_id }}

@@ -1,5 +1,6 @@
 """A12 Animation Production: one interface, swappable providers.
 - mock   : demo only — animates the approved first frame with a slow zoom (labelled DEMO).
+- hf     : LTX-2 Turbo on a public Hugging Face Space — image + line audio → lip-synced clip (default).
 - kaggle : real generation on Kaggle's free GPU via the official Kaggle API/CLI (kernels push/status/output).
 A provider never claims a capability it lacks: submit() → poll() → collect()."""
 from __future__ import annotations
@@ -26,7 +27,10 @@ class Provider:
 
 
 def get_provider() -> Provider:
-    name = env("VIDEO_PROVIDER", "mock" if demo_mode() else "kaggle")
+    name = env("VIDEO_PROVIDER", "mock" if demo_mode() else "hf")
+    if name == "hf":
+        from .hf import HFProvider
+        return HFProvider()
     if name == "kaggle":
         from .kaggle import KaggleProvider
         return KaggleProvider()

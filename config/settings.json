@@ -17,10 +17,10 @@
     "fps": 24
   },
   "generation": {
-    "provider": "kaggle",
+    "provider": "hf",
     "model": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
-    "gen_width": 384,
-    "gen_height": 672,
+    "gen_width": 576,
+    "gen_height": 1024,
     "frames": 81,
     "fps": 16,
     "steps": 30,
