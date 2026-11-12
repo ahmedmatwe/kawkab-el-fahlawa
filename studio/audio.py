@@ -49,11 +49,29 @@ def synth_line(character_id: str, text: str, emotion: str, out_wav: Path, retrie
 
 def synth_lines(items, retries: int = 1):
     """items: [{"character","text","emotion","out": Path}]. Egyptian-colloquial voices in one batch; edge-tts fallback."""
-    from . import egytts
+    from . import egytts, gemini_voice
     todo = [it for it in items if not Path(it["out"]).exists()]
     if not todo:
         return
-    if egytts.available():
+    if gemini_voice.available():  # 1st choice: Gemini (owner's pick); stops at the daily free quota
+        left = []
+        for it in todo:
+            if left:
+                left.append(it); continue
+            try:
+                p = Path(it["out"]); raw = p.with_suffix(".raw.wav")
+                gemini_voice.synth(it["character"], it["text"], it.get("emotion", ""), raw)
+                run(["-i", str(raw), "-af",
+                     "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,"
+                     "apad=pad_dur=0.12", "-ac", "1", "-ar", "48000", str(p)])
+                raw.unlink(missing_ok=True)
+            except Exception as e:
+                print("gemini tts stopped:", e)
+                left.append(it)
+        todo = left
+        if not todo:
+            return
+    if egytts.available():  # 2nd choice: NAMAA Egyptian voices via the egyptian-tts repo
         for attempt in range(retries + 1):
             try:
                 egytts.synth_batch(todo)

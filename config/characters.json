@@ -32,7 +32,11 @@
         "engine": "edge",
         "voice": "ar-EG-ShakirNeural",
         "pitch": "-8Hz",
-        "rate": "-4%"
+        "rate": "-4%",
+        "gemini": {
+          "voice": "Algenib",
+          "style": "راجل مصري عنده 48 سنة، معلم قهوة، صوته غليظ وتخين ومبحوح شوية، واثق جدًا من نفسه وبيتكلم بتقل وفهلوة"
+        }
       },
       "refs": [
         "assets/characters/approved/sayed_fahlawa_full_cutout.png",
@@ -57,7 +61,11 @@
         "engine": "edge",
         "voice": "ar-EG-ShakirNeural",
         "pitch": "+14Hz",
-        "rate": "+14%"
+        "rate": "+14%",
+        "gemini": {
+          "voice": "Puck",
+          "style": "شاب مصري عنده 24 سنة، صوته شبابي وخفيف، متحمس جدًا وبيتكلم بسرعة كأنه بيعمل لايف"
+        }
       },
       "refs": [
         "assets/characters/approved/zizo_trend_half_cutout.png"
@@ -81,7 +89,11 @@
         "engine": "edge",
         "voice": "ar-EG-SalmaNeural",
         "pitch": "-6Hz",
-        "rate": "+2%"
+        "rate": "+2%",
+        "gemini": {
+          "voice": "Gacrux",
+          "style": "ست مصرية بلدي عندها 52 سنة، صوتها قوي وواثق، ذكية ولسانها سريع وبتحب الرغي"
+        }
       },
       "refs": [
         "assets/characters/approved/om_abdo_full_cutout.png",
@@ -106,7 +118,11 @@
         "engine": "edge",
         "voice": "ar-EG-ShakirNeural",
         "pitch": "+3Hz",
-        "rate": "+4%"
+        "rate": "+4%",
+        "gemini": {
+          "voice": "Fenrir",
+          "style": "راجل مصري عنده 35 سنة، متحمس ومقتنع إنه عبقري، بيتكلم بانبهار بنفسه وبيبالغ"
+        }
       },
       "refs": [
         "assets/characters/refs/abdo_ekhtera_poster_b.png",
@@ -131,7 +147,11 @@
         "engine": "edge",
         "voice": "ar-EG-ShakirNeural",
         "pitch": "-16Hz",
-        "rate": "+8%"
+        "rate": "+8%",
+        "gemini": {
+          "voice": "Alnilam",
+          "style": "راجل مصري عنده 42 سنة، عصبي وصوته عالي وحاد، صريح وسريع الانفعال بس قلبه طيب"
+        }
       },
       "refs": [
         "assets/characters/approved/am_ragab_poster.png",

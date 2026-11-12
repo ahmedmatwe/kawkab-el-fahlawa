@@ -11,3 +11,5 @@ kaggle.json
 /*.png
 .venv-tts/
 hf-cache/
+/أصوات-الشخصيات/
+/مقارنة-الأصوات/
