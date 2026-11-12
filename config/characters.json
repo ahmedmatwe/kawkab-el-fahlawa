@@ -39,6 +39,7 @@
         }
       },
       "refs": [
+        "assets/characters/approved/sayed_v2_half_cutout.png",
         "assets/characters/approved/sayed_fahlawa_full_cutout.png",
         "assets/characters/approved/sayed_fahlawa_cafe.png"
       ]
@@ -68,6 +69,7 @@
         }
       },
       "refs": [
+        "assets/characters/approved/zizo_v2_half_cutout.png",
         "assets/characters/approved/zizo_trend_half_cutout.png"
       ]
     },

@@ -13,7 +13,7 @@ from typing import List, Optional
 
 from . import telegram as tg
 from .agents import ideas as ideas_agent
-from .agents import consistency, log_task, qa, safety, storyboard, trends, writer
+from .agents import consistency, log_task, producer, qa, safety, storyboard, trends, writer
 from .audio import synth_line, synth_lines
 from .config import DATA, demo_mode, settings
 from .db import audit, connect, episode, jload, kv_get, kv_set, now, set_status
@@ -118,6 +118,13 @@ def handle_command(con, data: str, cb_id: str = "") -> str:
         tg.answer_callback(cb_id, "تمام! بدأنا 🎬")
         tg.send(f"🎬 حلقة #{eid} «{json.loads(row['data'])['title']}» دخلت الإنتاج. هبعتلك أول ما تخلص.")
         return f"episode:{eid}"
+    if kind == "chat":
+        tg.answer_callback(cb_id, "تمام")
+        if arg == "cancel":
+            kv_set(con, "producer_chat", "")
+            tg.send("اتلغت 👍 ابعتلي في أي وقت لو عندك فكرة حلقة.")
+            return "chat_cancel"
+        return chat_start(con)
     if kind == "more":
         tg.answer_callback(cb_id, "ثواني…")
         kv_set(con, "ideas_sent_day", "")
@@ -147,16 +154,9 @@ def handle_command(con, data: str, cb_id: str = "") -> str:
 
 def handle_text(con, text: str) -> str:
     t = text.replace("أ", "ا")
-    if t.startswith("فكره") or t.startswith("فكرة"):
-        premise = text.split(" ", 1)[1].strip(" :") if " " in text else ""
-        if len(premise) < 10:
-            tg.send("اكتب الفكرة بعد كلمة «فكرة»، مثلًا: فكرة عبده بيخترع مروحة بتشتغل بالشاي")
-            return "short"
-        idea = {"title": premise[:40], "premise": premise, "characters": ["sayed_fahlawa", "zizo_trend", "om_abdo"],
-                "trend_title": "", "fact_basis": "", "risk": "low", "source": "owner"}
-        eid = start_episode(con, idea, None, "owner")
-        tg.send(f"🎬 فكرتك بقت حلقة #{eid}. بدأنا!")
-        return f"episode:{eid}"
+    chat = jload(kv_get(con, "producer_chat", "") or "", {}) or {}
+    if chat and t not in ("حالة", "الحالة", "status", "مساعدة", "help"):
+        return chat_turn(con, text)  # we're in the middle of a conversation about an episode
     if t in ("ابدا", "ابدأ", "يلا", "start"):
         row = con.execute("SELECT id FROM ideas WHERE day=? AND status='proposed' ORDER BY id LIMIT 1", (today(),)).fetchone()
         if row:
@@ -169,8 +169,64 @@ def handle_text(con, text: str) -> str:
         rows = con.execute("SELECT id,status,json_extract(idea,'$.title') t FROM episodes ORDER BY id DESC LIMIT 5").fetchall()
         tg.send("\n".join(f"#{r['id']} {r['t']} — {r['status']}" for r in rows) or "لسه مفيش حلقات")
         return "status"
-    tg.send("الأوامر: «ابدأ» · «غير» · «فكرة …» · «حالة»")
-    return "help"
+    if t in ("مساعدة", "help", "?", "؟"):
+        tg.send("اكتبلي الحلقة اللي في دماغك وهنتناقش فيها 🎬\nأو: «ابدأ» أول فكرة · «غير» أفكار تانية · «حالة» الحلقات")
+        return "help"
+    return chat_turn(con, text)  # anything else = the owner describing an episode → talk it through
+
+
+# ───────────────────────── producer chat (owner ↔ bot about a requested episode) ─────────────────────────
+SHOTS_PER_DAY = 3  # free Hugging Face lip-sync quota (≈3 s per shot)
+
+
+def eta_text(con) -> str:
+    """When would a new episode be ready, given the queue and the free daily video quota."""
+    ahead = con.execute("SELECT COUNT(*) n FROM shots s JOIN episodes e ON e.id=s.episode_id "
+                        "WHERE s.status IN ('pending','retry','generating') AND e.status NOT IN ('FAILED','PUBLISHED')").fetchone()["n"]
+    queued = con.execute("SELECT COUNT(*) n FROM episodes WHERE status IN ('SCRIPT_DRAFT','SCRIPT_APPROVED')").fetchone()["n"]
+    shots = ahead + 4 * queued + 4  # ~4 short lines per episode
+    days = max(1, -(-shots // SHOTS_PER_DAY))
+    day = (local_now() + dt.timedelta(days=days - 1)).date()
+    names = ["الاتنين", "التلات", "الأربع", "الخميس", "الجمعة", "السبت", "الحد"]
+    when = "النهارده بالليل" if days == 1 else "بكرة" if days == 2 else f"يوم {names[day.weekday()]} {day.strftime('%d/%m')}"
+    return (f"لو بدأنا دلوقتي الحلقة هتجهز تقريبًا {when} "
+            f"(قدامها {ahead + 4 * queued} لقطة في الطابور، والحصة المجانية حوالي {SHOTS_PER_DAY} لقطات في اليوم)")
+
+
+def chat_turn(con, text: str) -> str:
+    chat = jload(kv_get(con, "producer_chat", "") or "", {}) or {"history": [], "brief": {}}
+    chat["history"].append({"role": "owner", "text": text[:1500]})
+    try:
+        out = producer.converse(chat["history"], chat["brief"], eta_text(con))
+    except Exception as e:
+        tg.send("معلش حصلت مشكلة وأنا بفكر 🙏 ابعتلي تاني كمان شوية.")
+        audit(con, None, "producer", "error", str(e)[:300])
+        return "chat_error"
+    chat["brief"] = out["brief"]
+    chat["history"].append({"role": "bot", "text": out["reply"]})
+    kv_set(con, "producer_chat", json.dumps(chat, ensure_ascii=False))
+    if out["ready"]:
+        tg.send(out["reply"])
+        return chat_start(con)
+    tg.send(out["reply"], [[("✅ ابدأ الحلقة", "chat:go"), ("🗑️ إلغاء", "chat:cancel")]] if chat["brief"].get("premise") else None)
+    return "chat"
+
+
+def chat_start(con) -> str:
+    chat = jload(kv_get(con, "producer_chat", "") or "", {}) or {}
+    b = chat.get("brief") or {}
+    if not b.get("premise"):
+        tg.send("لسه محتاج أعرف الحلقة عن إيه 🙂 احكيلي.")
+        return "chat_empty"
+    idea = {"title": b.get("title") or b["premise"][:40],
+            "premise": b["premise"] + (f"\nتفاصيل متفق عليها مع صاحب القناة: {b['details']}" if b.get("details") else ""),
+            "characters": b.get("characters") or ["sayed_fahlawa", "zizo_trend"], "location": b.get("location", "cafe"),
+            "trend_title": "", "fact_basis": "", "risk": "low", "source": "owner_chat"}
+    eta = eta_text(con)
+    eid = start_episode(con, idea, None, "owner")
+    kv_set(con, "producer_chat", "")
+    tg.send(f"🎬 حلقة #{eid} «{idea['title']}» دخلت الإنتاج.\n{eta}.\nهبعتلك الحلقة تشوفها وتوافق قبل أي نشر.")
+    return f"episode:{eid}"
 
 
 # ───────────────────────── production stages ─────────────────────────

@@ -11,7 +11,7 @@ import requests
 
 from .config import demo_mode, env, redact
 
-DEFAULT_MODELS = "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-flash-latest"
+DEFAULT_MODELS = "gemini-3.5-flash,gemini-3.8-flash,gemini-3.7-flash,gemini-flash-latest"  # 3.5 first: fast + reliable on free tier (3.8 often 503)
 
 
 class LLMError(RuntimeError):
@@ -44,7 +44,7 @@ def gemini_json(system: str, prompt: str, temperature: float = 0.9, session: Any
                 r = session.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                     headers={"x-goog-api-key": key, "content-type": "application/json"},
-                    json=body, timeout=120)
+                    json=body, timeout=90)
             except requests.RequestException as e:  # transient network error → backoff
                 last = f"{model}: {e}"
                 time.sleep(2 ** attempt)
@@ -52,6 +52,9 @@ def gemini_json(system: str, prompt: str, temperature: float = 0.9, session: Any
             if r.status_code == 404:
                 last = f"{model}: not found"
                 break  # model not available → next model, no retry
+            if r.status_code == 503 and model != models[-1]:  # overloaded → try the next model right away
+                last = f"{model}: HTTP 503"
+                break
             if r.status_code in (429, 500, 502, 503, 504):
                 last = f"{model}: HTTP {r.status_code}"
                 time.sleep(min(30, 2 ** (attempt + 2)))
