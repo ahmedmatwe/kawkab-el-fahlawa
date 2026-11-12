@@ -13,3 +13,4 @@ kaggle.json
 hf-cache/
 /أصوات-الشخصيات/
 /مقارنة-الأصوات/
+worker/.wrangler/
