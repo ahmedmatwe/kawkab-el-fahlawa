@@ -68,9 +68,50 @@ def send_video(path: Path, caption: str, buttons=None) -> Optional[int]:
     return res.get("message_id") if res else None
 
 
+def queue_url() -> str:
+    return (env("TG_QUEUE_URL", "") or "").rstrip("/")
+
+
+def _queue(path: str, payload=None):
+    import requests
+    hdr = {"authorization": f"Bearer {env('TG_QUEUE_KEY', '')}"}
+    url = f"{queue_url()}{path}"
+    r = requests.post(url, json=payload, headers=hdr, timeout=30) if payload is not None else requests.get(url, headers=hdr, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def queue_pending() -> List[dict]:
+    """Webhook mode: the Cloudflare inbox (worker/) holds the owner's messages; items are Telegram updates or
+    {"_kind": "start_episode", "brief": {...}} from the instant producer chat."""
+    out = []
+    for row in _queue("/pending"):
+        it = row["item"]
+        it["_queue_key"] = row["key"]
+        msg = it.get("message") or (it.get("callback_query") or {}).get("message") or {}
+        it["_trusted"] = it.get("_kind") == "start_episode" or str(msg.get("chat", {}).get("id")) == str(env("TELEGRAM_CHAT_ID"))
+        out.append(it)
+    return out
+
+
+def queue_ack(keys: List[str]) -> None:
+    if keys:
+        _queue("/ack", {"keys": keys})
+
+
+def queue_status(eta: str) -> None:
+    if queue_url():
+        try:
+            _queue("/status", {"eta": eta})
+        except Exception as e:
+            print("queue status failed:", e)
+
+
 def updates(offset: int) -> List[dict]:
     if not enabled():
         return []
+    if queue_url():
+        return queue_pending()
     res = _api("getUpdates", offset=offset, timeout=0, allowed_updates=["message", "callback_query"]) or []
     chat = str(env("TELEGRAM_CHAT_ID"))
     out = []

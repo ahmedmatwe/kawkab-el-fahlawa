@@ -1,4 +1,4 @@
-"""CLI:  python -m studio tick | morning | demo | status | agents | pick <idea_id> | cmd <callback-data>"""
+"""CLI:  python -m studio tick | inbox | morning | demo | status | agents | pick <idea_id> | cmd <callback-data>"""
 from __future__ import annotations
 
 import json
@@ -14,6 +14,9 @@ def main(argv):
     cmd = argv[1] if len(argv) > 1 else "tick"
     if cmd == "tick":
         print(json.dumps(orc.tick(), ensure_ascii=False))
+    elif cmd == "inbox":  # quick run triggered by the Cloudflare inbox: process queued Telegram messages only
+        with connect() as con:
+            print(orc.handle_updates(con), "messages handled")
     elif cmd == "morning":
         with connect() as con:
             print(orc.morning(con, force=True), "ideas sent")

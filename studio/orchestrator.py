@@ -93,18 +93,38 @@ def start_episode(con, idea: dict, idea_id: Optional[int], by: str) -> int:
 def handle_updates(con) -> int:
     offset = int(kv_get(con, "tg_offset", "0") or 0)
     n = 0
+    done = []
     for u in tg.updates(offset):
-        kv_set(con, "tg_offset", u["update_id"] + 1)
+        if "update_id" in u and "_queue_key" not in u:
+            kv_set(con, "tg_offset", u["update_id"] + 1)
+        if "_queue_key" in u:
+            done.append(u["_queue_key"])
         if not u["_trusted"]:
             audit(con, None, "telegram", "ignored_untrusted_chat", "")
             continue
         n += 1
-        cb = u.get("callback_query")
-        if cb:
-            handle_command(con, cb.get("data", ""), cb_id=cb["id"])
-        elif (u.get("message") or {}).get("text"):
-            handle_text(con, u["message"]["text"].strip())
+        try:
+            if u.get("_kind") == "start_episode":
+                start_from_brief(con, u.get("brief") or {})
+                continue
+            cb = u.get("callback_query")
+            if cb:
+                handle_command(con, cb.get("data", ""), cb_id=cb["id"])
+            elif (u.get("message") or {}).get("text"):
+                handle_text(con, u["message"]["text"].strip())
+        finally:
+            con.commit()
+    tg.queue_ack(done)
+    tg.queue_status(eta_text(con))
     return n
+
+
+def start_from_brief(con, b: dict) -> int:
+    idea = {"title": b.get("title") or (b.get("premise") or "حلقة")[:40],
+            "premise": (b.get("premise") or "") + (f"\nتفاصيل متفق عليها مع صاحب القناة: {b['details']}" if b.get("details") else ""),
+            "characters": b.get("characters") or ["sayed_fahlawa", "zizo_trend"], "location": b.get("location", "cafe"),
+            "trend_title": "", "fact_basis": "", "risk": "low", "source": "owner_chat"}
+    return start_episode(con, idea, None, "owner")
 
 
 def handle_command(con, data: str, cb_id: str = "") -> str:

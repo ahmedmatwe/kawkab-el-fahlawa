@@ -5,6 +5,8 @@ name: studio
 on:
   schedule:
     - cron: '17 */2 * * *'   # every 2 hours: keeps the private repo inside the free 2000 min/month
+  repository_dispatch:
+    types: [tg]          # sent by the Cloudflare inbox (worker/) when the owner writes to the bot
   workflow_dispatch:
     inputs:
       command:
@@ -33,6 +35,8 @@ jobs:
       EGY_TTS_TOKEN: ${{ secrets.EGY_TTS_TOKEN }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       VIDEO_PROVIDER: ${{ vars.VIDEO_PROVIDER || 'hf' }}
+      TG_QUEUE_URL: ${{ vars.TG_QUEUE_URL }}
+      TG_QUEUE_KEY: ${{ secrets.TG_QUEUE_KEY }}
     steps:
       - name: Wait until Telegram is set up
         id: ready
@@ -49,11 +53,11 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -q -r requirements.txt && sudo apt-get -qq install -y ffmpeg >/dev/null
+      - run: pip install -q -r requirements.txt && { [ "${{ github.event_name }}" = repository_dispatch ] || sudo apt-get -qq install -y ffmpeg >/dev/null; }
         if: steps.ready.outputs.go == '1'
       - run: scripts/state.sh load
         if: steps.ready.outputs.go == '1'
-      - run: python -m studio ${{ inputs.command || 'tick' }}
+      - run: python -m studio ${{ github.event_name == 'repository_dispatch' && 'inbox' || inputs.command || 'tick' }}
         if: steps.ready.outputs.go == '1'
       - name: Save state
         if: always() && steps.ready.outputs.go == '1'
