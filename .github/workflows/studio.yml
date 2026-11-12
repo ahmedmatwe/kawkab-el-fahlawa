@@ -6,7 +6,7 @@ on:
   schedule:
     - cron: '17 */2 * * *'   # every 2 hours: keeps the private repo inside the free 2000 min/month
   repository_dispatch:
-    types: [tg]          # sent by the Cloudflare inbox (worker/) when the owner writes to the bot
+    types: [tg, wake]    # tg: the owner wrote to the bot · wake: free video quota is back (both sent by worker/)
   workflow_dispatch:
     inputs:
       command:
@@ -53,11 +53,11 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -q -r requirements.txt && { [ "${{ github.event_name }}" = repository_dispatch ] || sudo apt-get -qq install -y ffmpeg >/dev/null; }
+      - run: pip install -q -r requirements.txt && sudo apt-get -qq install -y ffmpeg >/dev/null
         if: steps.ready.outputs.go == '1'
       - run: scripts/state.sh load
         if: steps.ready.outputs.go == '1'
-      - run: python -m studio ${{ github.event_name == 'repository_dispatch' && 'inbox' || inputs.command || 'tick' }}
+      - run: python -m studio ${{ inputs.command || 'tick' }}   # a message from the inbox runs a full tick: the episode starts right away
         if: steps.ready.outputs.go == '1'
       - name: Save state
         if: always() && steps.ready.outputs.go == '1'

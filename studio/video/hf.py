@@ -4,7 +4,7 @@ Shots run one by one inside submit(); when the daily quota runs out the rest are
 so they are retried on a later run without counting as a failed attempt."""
 from __future__ import annotations
 
-import json, os, time
+import json, os, re, time
 from pathlib import Path
 from typing import Dict, List
 
@@ -18,7 +18,10 @@ NEG_STYLE = ("3D Pixar-style Egyptian cartoon, warm cinematic light, the speakin
 
 
 class QuotaExceeded(RuntimeError):
-    pass
+    def __init__(self, msg: str):
+        super().__init__(msg)
+        m = re.search(r"(\d+):(\d\d):(\d\d)", msg)
+        self.retry_after = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3)) if m else 6 * 3600
 
 
 def _hdr() -> dict:
@@ -59,17 +62,19 @@ class HFProvider(Provider):
     def submit(self, episode_id: int, shots: List[dict], workdir: Path) -> str:
         results: Dict[int, dict] = {}
         quota = False
+        retry_at = 0
         for s in shots:
             if quota:
-                results[s["idx"]] = {"ok": False, "quota": True, "error": "حصة Hugging Face اليومية خلصت"}
+                results[s["idx"]] = {"ok": False, "quota": True, "retry_at": retry_at, "error": "حصة Hugging Face اليومية خلصت"}
                 continue
             dst = workdir / f"shot_{s['idx']:02d}.mp4"
             try:
                 render(s["frame_path"], s["audio_path"], f"{s['prompt']} {NEG_STYLE}", dst)
                 results[s["idx"]] = {"ok": True, "path": str(dst)}
-            except QuotaExceeded:
+            except QuotaExceeded as e:
                 quota = True
-                results[s["idx"]] = {"ok": False, "quota": True, "error": "حصة Hugging Face اليومية خلصت"}
+                retry_at = int(time.time()) + e.retry_after + 60
+                results[s["idx"]] = {"ok": False, "quota": True, "retry_at": retry_at, "error": "حصة Hugging Face اليومية خلصت"}
             except Exception as e:
                 results[s["idx"]] = {"ok": False, "error": str(e)[:300]}
         (workdir / "hf_job.json").write_text(json.dumps(results, ensure_ascii=False))

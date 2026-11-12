@@ -32,13 +32,17 @@ async function tg(env, method, body) {
 const say = (env, text, buttons) => tg(env, "sendMessage", { chat_id: env.TG_CHAT_ID, text: text.slice(0, 4000),
   ...(buttons ? { reply_markup: { inline_keyboard: buttons.map((row) => row.map(([t, d]) => ({ text: t, callback_data: d }))) } } : {}) });
 
+async function dispatch(env, type) {
+  const r = await fetch(`https://api.github.com/repos/${env.GH_REPO}/dispatches`, { method: "POST",
+    headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "kawkab-inbox" },
+    body: JSON.stringify({ event_type: type }) });
+  return r.status;
+}
+
 async function enqueue(env, item) {
   const id = `q:${Date.now().toString().padStart(15, "0")}:${crypto.randomUUID().slice(0, 6)}`;
   await env.Q.put(id, JSON.stringify(item), { expirationTtl: 14 * 86400 });
-  const r = await fetch(`https://api.github.com/repos/${env.GH_REPO}/dispatches`, { method: "POST",
-    headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "kawkab-inbox" },
-    body: JSON.stringify({ event_type: "tg" }) });
-  return r.status;
+  return dispatch(env, "tg");
 }
 
 const BLOCKED = /وفاة|توفي|مقتل|قتل|انتحار|حادث|ضحايا|اغتصاب|تحرش|إرهاب|حرب|غزة|قصف|مرض|سرطان|طفل|أطفال|طفلة|رئيس الجمهورية|السيسي|انتخابات|حزب|كنيسة|مسجد|طائفي|سياسي|محاكمة|سجن|اعتقال|متهم|فساد/i;
@@ -120,6 +124,18 @@ async function chatTurn(env, text) {
 const authed = (req, env) => req.headers.get("authorization") === `Bearer ${env.QUEUE_KEY}`;
 
 export default {
+  // Reliable alarm (GitHub's own cron skips runs): wake the studio when the free video quota is back,
+  // and at least every 2 hours so open episodes never stall.
+  async scheduled(event, env, ctx) {
+    const nowMs = Date.now();
+    const wake = Number((await env.Q.get("wake_at")) || 0);
+    const last = Number((await env.Q.get("last_run")) || 0);
+    if ((wake && nowMs >= wake) || nowMs - last > 2 * 3600 * 1000) {
+      await env.Q.delete("wake_at");
+      await env.Q.put("last_run", String(nowMs));
+      ctx.waitUntil(dispatch(env, "wake"));
+    }
+  },
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (req.method === "POST" && url.pathname === "/tg") {
@@ -164,8 +180,10 @@ export default {
       return Response.json({ ok: true });
     }
     if (req.method === "POST" && url.pathname === "/status" && authed(req, env)) {
-      const { eta = "" } = await req.json();
+      const { eta = "", wake_at = 0 } = await req.json();
       await env.Q.put("eta", String(eta).slice(0, 400));
+      await env.Q.put("last_run", String(Date.now()));
+      if (wake_at) await env.Q.put("wake_at", String(wake_at * 1000)); else await env.Q.delete("wake_at");
       return Response.json({ ok: true });
     }
     return new Response("kawkab inbox");

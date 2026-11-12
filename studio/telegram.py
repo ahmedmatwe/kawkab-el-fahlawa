@@ -99,10 +99,11 @@ def queue_ack(keys: List[str]) -> None:
         _queue("/ack", {"keys": keys})
 
 
-def queue_status(eta: str) -> None:
+def queue_status(eta: str, wake_at: int = 0) -> None:
+    """Tell the Cloudflare inbox the current ETA and when to wake the studio (free video quota back)."""
     if queue_url():
         try:
-            _queue("/status", {"eta": eta})
+            _queue("/status", {"eta": eta, "wake_at": wake_at})
         except Exception as e:
             print("queue status failed:", e)
 

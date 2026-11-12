@@ -196,21 +196,42 @@ def handle_text(con, text: str) -> str:
 
 
 # ───────────────────────── producer chat (owner ↔ bot about a requested episode) ─────────────────────────
-SHOTS_PER_DAY = 3  # free Hugging Face lip-sync quota (≈3 s per shot)
+SHOTS_PER_DAY = 2  # free Hugging Face ZeroGPU quota ≈ 210 s/day; one lip-sync shot asks ~100 s
+
+
+def _when(ts: int) -> str:
+    t = dt.datetime.utcfromtimestamp(ts) + dt.timedelta(hours=settings()["timezone_offset_hours"])
+    d = (t.date() - local_now().date()).days
+    day = "النهارده" if d <= 0 else "بكرة" if d == 1 else f"يوم {['الاتنين','التلات','الأربع','الخميس','الجمعة','السبت','الحد'][t.weekday()]}"
+    h = t.hour % 12 or 12
+    part = "الصبح" if t.hour < 12 else "الضهر" if t.hour < 15 else "العصر" if t.hour < 18 else "بالليل"
+    return f"{day} الساعة {h}:{t.minute:02d} {part}"
+
+
+def delivery_ts(con, eid: int) -> int:
+    """When episode `eid` should reach the owner: shots ahead of it (older episodes) + its own, at SHOTS_PER_DAY,
+    starting when the free video quota is back; +15 min for editing/QA."""
+    def left(e):
+        return con.execute("SELECT COUNT(*) n FROM shots WHERE episode_id=? AND status IN ('pending','retry','generating')",
+                           (e,)).fetchone()["n"]
+    ahead = sum(left(r["id"]) for r in con.execute(
+        "SELECT id FROM episodes WHERE id<? AND status NOT IN ('FAILED','PUBLISHED','APPROVED','AWAITING_PUBLISH_APPROVAL')", (eid,)))
+    n = ahead + max(left(eid), 1)
+    start = max(now(), int(kv_get(con, "hf_retry_at", "0") or 0))
+    batches = -(-n // SHOTS_PER_DAY) - 1  # first batch runs at `start`
+    return int(start + batches * 86400 + 15 * 60)
 
 
 def eta_text(con) -> str:
-    """When would a new episode be ready, given the queue and the free daily video quota."""
+    """For the producer chat: when a new ~4-shot episode would reach the owner if we started now."""
     ahead = con.execute("SELECT COUNT(*) n FROM shots s JOIN episodes e ON e.id=s.episode_id "
                         "WHERE s.status IN ('pending','retry','generating') AND e.status NOT IN ('FAILED','PUBLISHED')").fetchone()["n"]
     queued = con.execute("SELECT COUNT(*) n FROM episodes WHERE status IN ('SCRIPT_DRAFT','SCRIPT_APPROVED')").fetchone()["n"]
-    shots = ahead + 4 * queued + 4  # ~4 short lines per episode
-    days = max(1, -(-shots // SHOTS_PER_DAY))
-    day = (local_now() + dt.timedelta(days=days - 1)).date()
-    names = ["الاتنين", "التلات", "الأربع", "الخميس", "الجمعة", "السبت", "الحد"]
-    when = "النهارده بالليل" if days == 1 else "بكرة" if days == 2 else f"يوم {names[day.weekday()]} {day.strftime('%d/%m')}"
-    return (f"لو بدأنا دلوقتي الحلقة هتجهز تقريبًا {when} "
-            f"(قدامها {ahead + 4 * queued} لقطة في الطابور، والحصة المجانية حوالي {SHOTS_PER_DAY} لقطات في اليوم)")
+    n = ahead + 4 * queued + 4
+    start = max(now(), int(kv_get(con, "hf_retry_at", "0") or 0))
+    ts = int(start + (-(-n // SHOTS_PER_DAY) - 1) * 86400 + 20 * 60)
+    return (f"لو بدأنا دلوقتي الحلقة هتوصلك تقريبًا {_when(ts)} "
+            f"(قدامها {ahead + 4 * queued} لقطة، والحصة المجانية حوالي {SHOTS_PER_DAY} لقطات في اليوم)")
 
 
 def chat_turn(con, text: str) -> str:
@@ -304,6 +325,10 @@ def stage_storyboard(con, eid: int) -> None:
                     (eid, s["idx"], json.dumps(s, ensure_ascii=False), s["prompt"], "pending", 0, str(wav)))
     log_task(con, eid, "A08+A11+A09+A13", "done", f"{len(shots)} shots, frames + voices ready")
     set_status(con, eid, "STORYBOARD_READY", storyboard=shots)
+    con.commit()
+    title = jload(episode(con, eid)["script"], {}).get("title", "")
+    tg.send(f"📝 حلقة #{eid} «{title}»: السيناريو والأصوات جاهزين ({len(shots)} لقطات).\n"
+            f"🎬 بدأنا التصوير دلوقتي.\n📬 الحلقة هتوصلك تشوفها وتوافق تقريبًا {_when(delivery_ts(con, eid))}.")
 
 
 def _shots(con, eid: int) -> List[dict]:
@@ -325,11 +350,13 @@ def _ensure_inputs(eid: int, shots: List[dict]) -> None:
                  for s in shots if not Path(s["audio_path"]).exists()])
 
 
-def stage_generate(con, eid: int) -> None:
+def stage_generate(con, eid: int):
     shots = [s for s in _shots(con, eid) if s["status"] in ("pending", "retry")]
     if not shots:
         set_status(con, eid, "EDITING")
         return
+    if int(kv_get(con, "hf_retry_at", "0") or 0) > now():
+        return "wait"  # free video quota not back yet → the next run after hf_retry_at continues
     _ensure_inputs(eid, shots)
     prov = get_provider()
     job = prov.submit(eid, shots, epdir(eid))
@@ -375,6 +402,8 @@ def stage_poll(con, eid: int) -> bool:
                 continue
         reason = r.get("error") or "; ".join(errs)
         if r.get("quota"):  # free daily GPU quota ran out: not the shot's fault → retry later, attempt not counted
+            if r.get("retry_at"):
+                kv_set(con, "hf_retry_at", max(int(kv_get(con, "hf_retry_at", "0") or 0), int(r["retry_at"])))
             con.execute("UPDATE shots SET status='retry', attempts=MAX(attempts-1,0), error=? WHERE episode_id=? AND idx=?",
                         (reason, eid, s["idx"]))
             failed.append(f"لقطة {s['idx'] + 1}: {reason}")
@@ -384,6 +413,11 @@ def stage_poll(con, eid: int) -> bool:
                     ("fallback" if final else "retry", reason, eid, s["idx"]))
         failed.append(f"لقطة {s['idx'] + 1}: {reason}")
     log_task(con, eid, "A12+A09", state, f"{len(results)} clips back, {len(failed)} problems", failed)
+    if any(r.get("quota") for r in results.values()):
+        left = sum(1 for s in _shots(con, eid) if s["status"] in ("pending", "retry"))
+        done = sum(1 for s in _shots(con, eid) if s["status"] == "done")
+        tg.send(f"⏳ حلقة #{eid}: خلصنا {done} لقطة، وفاضل {left}. حصة الفيديو المجانية النهارده خلصت، "
+                f"وهتتجدد {_when(int(kv_get(con, 'hf_retry_at', '0') or 0))}.\n📬 الحلقة هتوصلك تقريبًا {_when(delivery_ts(con, eid))}.")
     if any(s["status"] == "retry" for s in _shots(con, eid)):
         set_status(con, eid, "STORYBOARD_READY")  # regenerate only the failed shots
     else:
@@ -485,7 +519,9 @@ def advance(con, eid: int, max_steps: int = 10) -> str:
             fn = STAGES.get(st)
             if not fn:
                 break
-            fn(con, eid)
+            if fn(con, eid) == "wait":
+                con.commit()
+                break
             con.commit()
         except Exception as e:
             con.rollback()
@@ -511,4 +547,6 @@ def tick() -> dict:
         for r in con.execute(f"SELECT id FROM episodes WHERE status IN ({','.join('?' * len(OPEN))}) ORDER BY id",
                              OPEN).fetchall():
             out[r["id"]] = advance(con, r["id"])
+        con.commit()
+        tg.queue_status(eta_text(con), wake_at=int(kv_get(con, "hf_retry_at", "0") or 0) if out else 0)
         return {"updates": n_up, "ideas": n_ideas, "episodes": out}

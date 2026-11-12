@@ -10,3 +10,6 @@ GH_REPO = "ahmedmatwe/kawkab-el-fahlawa"
 [[kv_namespaces]]
 binding = "Q"
 id = "b13dac779cd34109a8ba57941e5232b7"
+
+[triggers]
+crons = ["*/15 * * * *"]
