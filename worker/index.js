@@ -12,6 +12,10 @@ const SYSTEM = `إنت منتج مسلسل الكرتون المصري «كوك�
    وقوله هتجهز إمتى حسب المعلومة اللي جاتلك، واسأله «أبدأ؟».
 4) لو وافق (تمام/ابدأ/موافق/يلا…) خلي ready=true.
 5) لو طلب حاجة فيها أشخاص حقيقيين بأسمائهم، أو سياسة، أو دين بشكل مسيء، أو مشاهد مش محترمة — اعتذر بلطف واقترح بديل.
+6) لو سأل عن التريند/الترندات/حاجة جديدة النهارده: استخدم «تريندات مصر النهارده» اللي جاتلك بس (متألفش تريندات)،
+   واختار منها 3 أو 4 ينفعوا كوميديا عائلية، كل واحد في سطر: اسم التريند + ليه رائج باختصار + فكرة حلقة مضحكة بشخصياتنا.
+   لو التريند عن شخص حقيقي (لاعب/ممثل/مسؤول) خد «الموضوع» بس ومتحطش الشخص نفسه في الحلقة.
+   وفي الآخر اسأله يختار أنهي، أو يقولك «هات غيرهم».
 الشخصيات المتاحة (استخدم الـ id في brief.characters):
 ${BIBLE.map((c) => `- ${c.id} = ${c.name} (${c.age}): ${c.personality}`).join("\n")}
 رجّع JSON بس بالشكل ده:
@@ -37,9 +41,41 @@ async function enqueue(env, item) {
   return r.status;
 }
 
-async function gemini(env, history, brief, eta) {
+const BLOCKED = /وفاة|توفي|مقتل|قتل|انتحار|حادث|ضحايا|اغتصاب|تحرش|إرهاب|حرب|غزة|قصف|مرض|سرطان|طفل|أطفال|طفلة|رئيس الجمهورية|السيسي|انتخابات|حزب|كنيسة|مسجد|طائفي|سياسي|محاكمة|سجن|اعتقال|متهم|فساد/i;
+const TREND_WORDS = /تر[يى]?ند|ترند|الترند|التريند|رائج|الجديد النهارده|اخبار النهارده|أخبار النهارده|الناس بتتكلم/;
+const unx = (t) => (t || "").replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+
+async function trends(env) {
+  const cached = await env.Q.get("trends");
+  if (cached) return JSON.parse(cached);
+  const out = [];
+  try {
+    const x = await (await fetch("https://trends.google.com/trending/rss?geo=EG", { headers: { "user-agent": "Mozilla/5.0" } })).text();
+    for (const it of x.split("<item>").slice(1)) {
+      const title = unx((it.match(/<title>([\s\S]*?)<\/title>/) || [])[1]);
+      const traffic = unx((it.match(/<ht:approx_traffic>([\s\S]*?)<\/ht:approx_traffic>/) || [])[1]);
+      const news = unx((it.match(/<ht:news_item_title>([\s\S]*?)<\/ht:news_item_title>/) || [])[1]);
+      if (title && !BLOCKED.test(title + " " + news)) out.push({ title, traffic, news });
+    }
+  } catch (e) {}
+  try {
+    const x = await (await fetch("https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar", { headers: { "user-agent": "Mozilla/5.0" } })).text();
+    for (const it of x.split("<item>").slice(1, 16)) {
+      const title = unx((it.match(/<title>([\s\S]*?)<\/title>/) || [])[1]);
+      if (title && !BLOCKED.test(title)) out.push({ title, traffic: "خبر", news: "" });
+    }
+  } catch (e) {}
+  const list = out.slice(0, 25);
+  if (list.length) await env.Q.put("trends", JSON.stringify(list), { expirationTtl: 90 * 60 });
+  return list;
+}
+
+async function gemini(env, history, brief, eta, trendList) {
+  const trendText = trendList && trendList.length
+    ? "\n\nتريندات مصر النهارده (Google Trends + Google News، دلوقتي):\n" + trendList.map((t, i) => `${i + 1}. ${t.title}${t.traffic ? ` (${t.traffic})` : ""}${t.news ? ` — ${t.news}` : ""}`).join("\n")
+    : "";
   const convo = history.slice(-16).map((m) => `${m.role === "owner" ? "صاحب القناة" : "إنت"}: ${m.text}`).join("\n");
-  const prompt = `المعلومة عن الميعاد: ${eta}\n\nالخطة لحد دلوقتي (JSON): ${JSON.stringify(brief)}\n\nالمحادثة:\n${convo}\n\nرد على آخر رسالة.`;
+  const prompt = `المعلومة عن الميعاد: ${eta}${trendText}\n\nالخطة لحد دلوقتي (JSON): ${JSON.stringify(brief)}\n\nالمحادثة:\n${convo}\n\nرد على آخر رسالة.`;
   for (const m of MODELS) {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: "POST",
       headers: { "x-goog-api-key": env.GEMINI_API_KEY, "content-type": "application/json" },
@@ -72,7 +108,8 @@ async function chatTurn(env, text) {
   const chat = JSON.parse((await env.Q.get("chat")) || '{"history":[],"brief":{}}');
   chat.history.push({ role: "owner", text: text.slice(0, 1500) });
   const eta = (await env.Q.get("eta")) || "الميعاد هيتحدد أول ما الفريق يشوف الطابور";
-  const out = await gemini(env, chat.history, chat.brief, eta);
+  const wantsTrends = TREND_WORDS.test(text) || chat.history.slice(-6).some((m) => TREND_WORDS.test(m.text));
+  const out = await gemini(env, chat.history, chat.brief, eta, wantsTrends ? await trends(env) : null);
   if (!out) { await say(env, "معلش Gemini مضغوط دلوقتي 🙏 ابعتلي تاني كمان دقيقة."); return; }
   chat.brief = out.brief; chat.history.push({ role: "bot", text: out.reply || "تمام" });
   await env.Q.put("chat", JSON.stringify(chat), { expirationTtl: 3 * 86400 });
