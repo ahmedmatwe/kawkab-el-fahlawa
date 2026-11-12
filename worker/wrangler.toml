@@ -1,6 +1,8 @@
 name = "kawkab-inbox"
 main = "index.js"
 compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
 
 [vars]
 GH_REPO = "ahmedmatwe/kawkab-el-fahlawa"
@@ -8,5 +10,3 @@ GH_REPO = "ahmedmatwe/kawkab-el-fahlawa"
 [[kv_namespaces]]
 binding = "Q"
 id = "b13dac779cd34109a8ba57941e5232b7"
-workers_dev = true
-preview_urls = false
