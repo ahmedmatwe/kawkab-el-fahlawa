@@ -22,7 +22,7 @@ ${BIBLE.map((c) => `- ${c.id} = ${c.name} (${c.age}): ${c.personality}`).join("\
 {"reply": "ردك", "ready": false, "brief": {"title": "عنوان قصير", "premise": "الفكرة في سطرين",
  "details": "كل التفاصيل اللي اتفقتوا عليها", "characters": ["sayed_fahlawa"], "location": "cafe|alley|home|shop"}}`;
 const COMMANDS = ["حالة", "الحالة", "status", "غير", "افكار", "أفكار", "more", "ابدا", "ابدأ", "start", "مساعدة", "help"];
-const MODELS = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"];
+const MODELS = ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.8-flash", "gemini-flash-latest"];
 
 async function tg(env, method, body) {
   const r = await fetch(`https://api.telegram.org/bot${env.TG_TOKEN}/${method}`, {

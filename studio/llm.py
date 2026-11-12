@@ -11,7 +11,7 @@ import requests
 
 from .config import demo_mode, env, redact
 
-DEFAULT_MODELS = "gemini-3.5-flash,gemini-3.8-flash,gemini-3.7-flash,gemini-flash-latest"  # 3.5 first: fast + reliable on free tier (3.8 often 503)
+DEFAULT_MODELS = "gemini-3.5-flash,gemini-3-flash-preview,gemini-3.8-flash,gemini-3.1-flash-lite,gemini-flash-latest"  # 3.5 first: fast + reliable on free tier (3.8 often 503)
 
 
 class LLMError(RuntimeError):
