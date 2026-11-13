@@ -8,14 +8,17 @@ from ..config import bible, settings
 from ..llm import ask_json
 from .safety import banned_hits
 
-CHARS_PER_SEC = 13.0  # measured pace of the Egyptian edge-tts voices incl. pauses
+CHARS_PER_SEC = 12.0  # measured pace of the Gemini Egyptian voices incl. pauses
+MAX_LINES = 4    # short episodes: the free video quota is ~2 lip-synced shots/day → an episode is ready in 2 days
+MAX_CHARS = 45   # one line = one ~3 s lip-synced shot (editor may slow it ≤1.35×)
 
 WRITER_SYSTEM = """You are the Head Comedy Writer AND Egyptian Dialogue Specialist of the 3D cartoon "كوكب الفهلوة".
-Write ONE short vertical episode (35–55 seconds spoken) in natural Egyptian Arabic (عامية مصرية), family friendly.
-Structure: hook in the first line (problem or absurd claim within 2 seconds) → a "clever" solution by a character →
-escalation → comic disaster/twist ending → a closing reaction or catchphrase.
+Write ONE very short vertical episode (12–18 seconds spoken, a Reel/Short) in natural Egyptian Arabic (عامية مصرية), family friendly.
+EXACTLY 4 lines: 1) hook — a problem or absurd claim → 2) a "clever" fahlawa solution → 3) it backfires →
+4) punchline / closing reaction (a catchphrase is welcome here).
 Each character keeps their personality and speech style. Use a catchphrase at most twice per episode.
-Lines are short (max ~90 Arabic characters), each line is ONE speaker. 6–10 lines total.
+Every line is ONE speaker and VERY short: max 40 Arabic characters (5–7 words, one breath, under 3.5 seconds),
+because each line becomes one 3-second lip-synced shot. Punchy, no filler words.
 No children on screen, no real people mocked, no profanity, no innuendo. Write Arabic with correct spelling.
 Return JSON: {"title":"","logline":"","location":"cafe|alley|grocery|microbus|workshop",
 "lines":[{"speaker":"character id","text":"Egyptian Arabic","emotion":"happy|angry|surprised|sad|laughing|thinking|neutral",
@@ -41,15 +44,10 @@ def mock_script(idea: dict, weak: bool = False) -> dict:
     return {
         "title": idea["title"], "logline": idea["premise"], "location": "cafe",
         "lines": [
-            {"speaker": "zizo_trend", "text": "يا معلم! القهوة دي محتاجة مساعد ذكاء اصطناعي ياخد الطلبات!", "emotion": "happy", "action_en": "waves his smartphone excitedly"},
-            {"speaker": "sayed_fahlawa", "text": "اسمع مني أنا… أنا فاهم اللعبة دي! شغّله وأنا أعلّمه الأصول.", "emotion": "laughing", "action_en": "pats his chest proudly"},
-            {"speaker": "zizo_trend", "text": "خلاص اتعلم منك كل حاجة يا معلم… يا جدعان دي هتكسر الدنيا!", "emotion": "surprised", "action_en": "shows the phone screen"},
-            {"speaker": "am_ragab", "text": "واحد شاي لو سمحت.", "emotion": "neutral", "action_en": "sits down on a wooden chair"},
-            {"speaker": "zizo_trend", "text": "المساعد بيقول: الشاي بعشرة، والكرسي بخمسة، والقعدة في الضل بعشرين!", "emotion": "surprised", "action_en": "reads from the phone, shocked"},
-            {"speaker": "am_ragab", "text": "أنا من أولها قلتلكم الموضوع مش طبيعي!", "emotion": "angry", "action_en": "throws his hands up angrily"},
-            {"speaker": "sayed_fahlawa", "text": "الله! ده طلع شاطر… بس استنى، بيقول عليّا أنا كمان حساب قديم!", "emotion": "surprised", "action_en": "looks at the phone, eyes wide"},
-            {"speaker": "om_abdo", "text": "أنا ماليش دعوة… بس المساعد ده بيقول إنك مدّيني تلات شهور شكك يا معلم!", "emotion": "laughing", "action_en": "points at Sayed with a teasing smile"},
-            {"speaker": "sayed_fahlawa", "text": "اقفله يا زيزو! اقفله قبل ما يفتح دفاتر الحارة كلها!", "emotion": "angry", "action_en": "waves both hands in panic"},
+            {"speaker": "zizo_trend", "text": "يا معلم! جبتلك مساعد ذكاء اصطناعي!", "emotion": "happy", "action_en": "waves his smartphone excitedly"},
+            {"speaker": "sayed_fahlawa", "text": "شغّله… وأنا هعلّمه الفهلوة!", "emotion": "laughing", "action_en": "pats his chest proudly"},
+            {"speaker": "zizo_trend", "text": "بيقول عليك حساب قديم يا معلم!", "emotion": "surprised", "action_en": "shows the phone screen, shocked"},
+            {"speaker": "sayed_fahlawa", "text": "اقفله يا زيزو! اقفله بسرعة!", "emotion": "angry", "action_en": "waves both hands in panic"},
         ],
         "metadata": {"title": "المعلم سيد علّم الذكاء الاصطناعي الفهلوة 😂", "description": "لما المساعد الذكي يتعلم فهلوة المعلم… ويطلع عليه هو! محتوى كرتوني مولّد بالذكاء الاصطناعي.",
                      "hashtags": ["#كوكب_الفهلوة", "#كرتون_مصري", "#كوميديا", "#ذكاء_اصطناعي"]},
@@ -66,13 +64,13 @@ def deterministic_checks(script: dict) -> List[str]:
     lo, hi = settings()["target_seconds"]
     p: List[str] = []
     lines = script.get("lines") or []
-    if not 4 <= len(lines) <= 12:
-        p.append(f"عدد الجمل {len(lines)} (المطلوب 4–12)")
+    if len(lines) != MAX_LINES:
+        p.append(f"عدد الجمل {len(lines)} (المطلوب {MAX_LINES} بالظبط — حلقة قصيرة)")
     for i, l in enumerate(lines):
         if l.get("speaker") not in ids:
             p.append(f"جملة {i + 1}: متكلم غير معروف {l.get('speaker')}")
-        if not l.get("text") or len(l["text"]) > 120:
-            p.append(f"جملة {i + 1}: فاضية أو أطول من 120 حرف")
+        if not l.get("text") or len(l["text"]) > MAX_CHARS:
+            p.append(f"جملة {i + 1}: فاضية أو أطول من {MAX_CHARS} حرف (لازم تتقال في أقل من 3.5 ثانية)")
     secs = estimate_seconds(script)
     if not lo - 5 <= secs <= hi:
         p.append(f"المدة المتوقعة {secs:.0f} ثانية (المطلوب {lo}–{hi})")
