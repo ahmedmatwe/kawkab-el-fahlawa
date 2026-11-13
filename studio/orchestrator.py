@@ -431,6 +431,14 @@ def stage_edit(con, eid: int) -> None:
     shots = _shots(con, eid)
     _ensure_inputs(eid, shots)
     d = epdir(eid)
+    lost = [s for s in shots if s["status"] == "done" and not (s["video_path"] and Path(s["video_path"]).exists())]
+    if lost:  # a finished clip didn't survive between cloud runs → render it again, never cover it with a still
+        for s in lost:
+            con.execute("UPDATE shots SET status='retry', video_path=NULL, error=? WHERE episode_id=? AND idx=?",
+                        ("الفيديو اتفقد بين التشغيلات — هيتعمل تاني", eid, s["idx"]))
+        log_task(con, eid, "A16", "retry", f"{len(lost)} finished clips missing → re-render")
+        set_status(con, eid, "STORYBOARD_READY")
+        return "wait"
     clips = []
     for s in shots:
         if s["status"] == "done" and s["video_path"] and Path(s["video_path"]).exists():

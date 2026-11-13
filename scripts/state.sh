@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Persist studio state (SQLite + small per-episode files) on the `state` branch between cloud runs.
-# Videos (*.mp4) are NOT stored in git: they are sent to Telegram and kept as workflow artifacts.
+# Finished shot clips (shot_*.mp4, ~1–3 MB) ARE kept so a fresh runner can edit the episode; final videos are not
+# (they go to Telegram + artifacts). Without this a later run would replace lost shots with still frames.
 set -euo pipefail
 cmd=${1:?load|save}
 if [ "$cmd" = load ]; then
@@ -16,7 +17,7 @@ elif [ "$cmd" = save ]; then
   else git worktree add -q --orphan -b state .state 2>/dev/null || { git worktree add -q --detach .state && (cd .state && git checkout -q --orphan state && git rm -rqf . || true); }; fi
   mkdir -p .state/data
   rsync -a --delete --prune-empty-dirs --include='*/' --include='studio.db' \
-    --include='*.jpg' --include='*.wav' --include='*.json' --include='*.ass' --include='*.srt' --exclude='*' data/ .state/data/
+    --include='*.jpg' --include='*.wav' --include='shot_*.mp4' --include='*.json' --include='*.ass' --include='*.srt' --exclude='*' data/ .state/data/
   cd .state
   git add -A data
   if git diff --cached --quiet; then echo "no state change"; else
