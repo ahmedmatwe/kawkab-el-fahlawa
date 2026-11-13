@@ -27,7 +27,9 @@ Return JSON: {"title":"","logline":"","location":"cafe|alley|grocery|microbus|wo
 
 EDITOR_SYSTEM = """You are the strict Script Quality Editor of "كوكب الفهلوة". Score the script honestly; do not be generous.
 Rubric (total 100): hook_first_2s 20, clarity 15, real comedic logic (not random jokes) 20, characters true to bible 15,
-ending surprise 15, Egyptian dialogue naturalness 10, feasibility with simple 5-second animated shots 5.
+ending surprise 15, Egyptian dialogue naturalness 10, feasibility with simple 3-second lip-synced shots 5.
+The format is intentionally a 3-line micro-episode (hook → fahlawa solution → backfire + punchline, ~10 s):
+never penalise it for being short or for having only 3 lines; judge how much comedy it packs into them.
 Return JSON: {"score":0-100,"verdict":"approve|revise","problems":["Arabic"],"fixes":["Arabic concrete instructions"]}"""
 
 
@@ -90,7 +92,7 @@ def write(idea: dict, notes: str = "", weak_mock: bool = False) -> dict:
 def review(script: dict) -> Tuple[int, List[str], List[str]]:
     hard = deterministic_checks(script)
     lines = "\n".join(f"{l['speaker']}: {l['text']}  [{l.get('action_en', '')}]" for l in script.get("lines", []))
-    mock_score = 40 if len(script.get("lines", [])) < 4 else 86
+    mock_score = 40 if len(script.get("lines", [])) < MAX_LINES else 86
     data = ask_json(EDITOR_SYSTEM, f"Character bible:\n{_bible_text()}\n\nScript '{script.get('title')}':\n{lines}",
                     mock=lambda: {"score": mock_score, "verdict": "approve" if mock_score >= 75 else "revise",
                                   "problems": [] if mock_score >= 75 else ["السيناريو قصير جدًا ومفيهوش موقف"],
