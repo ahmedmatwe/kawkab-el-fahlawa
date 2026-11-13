@@ -196,7 +196,7 @@ def handle_text(con, text: str) -> str:
 
 
 # ───────────────────────── producer chat (owner ↔ bot about a requested episode) ─────────────────────────
-SHOTS_PER_DAY = 2  # free Hugging Face ZeroGPU quota ≈ 210 s/day; one lip-sync shot asks ~100 s
+SHOTS_PER_DAY = 3  # free Hugging Face ZeroGPU quota: measured 3 lip-sync shots/day
 
 
 def _when(ts: int) -> str:
@@ -227,11 +227,11 @@ def eta_text(con) -> str:
     ahead = con.execute("SELECT COUNT(*) n FROM shots s JOIN episodes e ON e.id=s.episode_id "
                         "WHERE s.status IN ('pending','retry','generating') AND e.status NOT IN ('FAILED','PUBLISHED')").fetchone()["n"]
     queued = con.execute("SELECT COUNT(*) n FROM episodes WHERE status IN ('SCRIPT_DRAFT','SCRIPT_APPROVED')").fetchone()["n"]
-    n = ahead + 4 * queued + 4
+    n = ahead + 3 * queued + 3
     start = max(now(), int(kv_get(con, "hf_retry_at", "0") or 0))
     ts = int(start + (-(-n // SHOTS_PER_DAY) - 1) * 86400 + 20 * 60)
     return (f"لو بدأنا دلوقتي الحلقة هتوصلك تقريبًا {_when(ts)} "
-            f"(قدامها {ahead + 4 * queued} لقطة، والحصة المجانية حوالي {SHOTS_PER_DAY} لقطات في اليوم)")
+            f"(قدامها {ahead + 3 * queued} لقطة، والحصة المجانية حوالي {SHOTS_PER_DAY} لقطات في اليوم)")
 
 
 def chat_turn(con, text: str) -> str:

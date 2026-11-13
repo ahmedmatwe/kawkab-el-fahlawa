@@ -1,4 +1,4 @@
-"""CLI:  python -m studio tick | inbox | morning | demo | status | agents | pick <idea_id> | cmd <callback-data>"""
+"""CLI:  python -m studio tick | inbox | reset <id> | morning | demo | status | agents | pick <idea_id> | cmd <callback-data>"""
 from __future__ import annotations
 
 import json
@@ -14,6 +14,15 @@ def main(argv):
     cmd = argv[1] if len(argv) > 1 else "tick"
     if cmd == "tick":
         print(json.dumps(orc.tick(), ensure_ascii=False))
+    elif cmd == "reset":  # python -m studio reset <episode_id>: rewrite the episode from its idea (keeps the idea)
+        eid = int(argv[2])
+        import shutil
+        shutil.rmtree(orc.epdir(eid), ignore_errors=True)  # old frames/voices must not be reused for the new lines
+        with connect() as con:
+            con.execute("DELETE FROM shots WHERE episode_id=?", (eid,))
+            con.execute("UPDATE episodes SET status='SCRIPT_DRAFT', script=NULL, storyboard=NULL, attempts=0, error='' WHERE id=?", (eid,))
+            con.commit()
+            print("episode", eid, "→", orc.advance(con, eid))
     elif cmd == "inbox":  # quick run triggered by the Cloudflare inbox: process queued Telegram messages only
         with connect() as con:
             print(orc.handle_updates(con), "messages handled")

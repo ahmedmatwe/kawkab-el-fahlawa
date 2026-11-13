@@ -4,8 +4,8 @@
   "episodes_per_day": 1,
   "ideas_per_morning": 3,
   "target_seconds": [
-    12,
-    20
+    9,
+    15
   ],
   "shots_per_episode": [
     6,

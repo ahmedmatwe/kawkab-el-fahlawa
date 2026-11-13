@@ -9,13 +9,13 @@ from ..llm import ask_json
 from .safety import banned_hits
 
 CHARS_PER_SEC = 12.0  # measured pace of the Gemini Egyptian voices incl. pauses
-MAX_LINES = 4    # short episodes: the free video quota is ~2 lip-synced shots/day → an episode is ready in 2 days
+MAX_LINES = 3    # same-day episodes: the free video quota gives ~3 lip-synced shots/day
 MAX_CHARS = 45   # one line = one ~3 s lip-synced shot (editor may slow it ≤1.35×)
 
 WRITER_SYSTEM = """You are the Head Comedy Writer AND Egyptian Dialogue Specialist of the 3D cartoon "كوكب الفهلوة".
-Write ONE very short vertical episode (12–18 seconds spoken, a Reel/Short) in natural Egyptian Arabic (عامية مصرية), family friendly.
-EXACTLY 4 lines: 1) hook — a problem or absurd claim → 2) a "clever" fahlawa solution → 3) it backfires →
-4) punchline / closing reaction (a catchphrase is welcome here).
+Write ONE very short vertical episode (9–13 seconds spoken, a Reel/Short) in natural Egyptian Arabic (عامية مصرية), family friendly.
+EXACTLY 3 lines: 1) hook — a problem or absurd claim → 2) a "clever" fahlawa solution →
+3) it backfires + punchline in the same line (a catchphrase is welcome here).
 Each character keeps their personality and speech style. Use a catchphrase at most twice per episode.
 Every line is ONE speaker and VERY short: max 40 Arabic characters (5–7 words, one breath, under 3.5 seconds),
 because each line becomes one 3-second lip-synced shot. Punchy, no filler words.
@@ -47,7 +47,6 @@ def mock_script(idea: dict, weak: bool = False) -> dict:
             {"speaker": "zizo_trend", "text": "يا معلم! جبتلك مساعد ذكاء اصطناعي!", "emotion": "happy", "action_en": "waves his smartphone excitedly"},
             {"speaker": "sayed_fahlawa", "text": "شغّله… وأنا هعلّمه الفهلوة!", "emotion": "laughing", "action_en": "pats his chest proudly"},
             {"speaker": "zizo_trend", "text": "بيقول عليك حساب قديم يا معلم!", "emotion": "surprised", "action_en": "shows the phone screen, shocked"},
-            {"speaker": "sayed_fahlawa", "text": "اقفله يا زيزو! اقفله بسرعة!", "emotion": "angry", "action_en": "waves both hands in panic"},
         ],
         "metadata": {"title": "المعلم سيد علّم الذكاء الاصطناعي الفهلوة 😂", "description": "لما المساعد الذكي يتعلم فهلوة المعلم… ويطلع عليه هو! محتوى كرتوني مولّد بالذكاء الاصطناعي.",
                      "hashtags": ["#كوكب_الفهلوة", "#كرتون_مصري", "#كوميديا", "#ذكاء_اصطناعي"]},
