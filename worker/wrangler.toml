@@ -11,5 +11,5 @@ GH_REPO = "ahmedmatwe/kawkab-el-fahlawa"
 binding = "Q"
 id = "b13dac779cd34109a8ba57941e5232b7"
 
-[triggers]
-crons = ["*/15 * * * *"]
+# No cron here: the free Cloudflare account already uses its 5 cron triggers (other projects).
+# The studio is woken by GitHub cron (every 2 h), by every Telegram message, and by quota-aware ticks.
