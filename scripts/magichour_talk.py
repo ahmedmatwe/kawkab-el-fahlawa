@@ -31,7 +31,7 @@ for i, ln in enumerate(lines):
         body = {"name": f"kawkab {script['title']} {f}", "start_seconds": 0, "end_seconds": secs, "resolution": "480p",  # free plan: 480p only
                 "assets": {"image_file_path": upload(d / f"frame_{f}.jpg", "image"), "audio_file_path": upload(d / f"line_{f}.wav", "audio")},
                 "style": {"generation_mode": "prompted",
-                          "prompt": f"3D Pixar-style Egyptian cartoon character talking expressively with natural lip sync and small gestures: {ln.get('action_en', '')}"}}
+                          "prompt": f"3D Pixar-style Egyptian cartoon scene, natural lip sync for the speaker only, everyone moves naturally: {ln.get('action_en', '')}"}}
         r = requests.post(f"{API}/ai-talking-photo", headers=H, json=body, timeout=60)
         if not r.ok:
             sys.exit(f"shot {i}: {r.status_code} {r.text[:400]}")
