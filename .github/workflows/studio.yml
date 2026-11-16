@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write   # save state on the `state` branch
+  contents: read    # state is saved in the private repo ahmedmatwe/kawkab-state (secret STATE_TOKEN)
 
 jobs:
   tick:
@@ -37,6 +37,7 @@ jobs:
       VIDEO_PROVIDER: ${{ vars.VIDEO_PROVIDER || 'hf' }}
       TG_QUEUE_URL: ${{ vars.TG_QUEUE_URL }}
       TG_QUEUE_KEY: ${{ secrets.TG_QUEUE_KEY }}
+      STATE_TOKEN: ${{ secrets.STATE_TOKEN }}
     steps:
       - name: Wait until Telegram is set up
         id: ready
